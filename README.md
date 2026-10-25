@@ -48,3 +48,32 @@ La selección de los Test Doubles para las pruebas unitarias de CitaReminderServ
 **ReminderChannel → Mock.** Se utilizó un mock para verificar que la estrategia seleccionada recibe correctamente la cita y el mensaje mediante el método enviar(). La prueba comprueba que dicha operación se invoque una vez, sin realizar envíos reales de correo electrónico o SMS. Esta decisión permite aislar la lógica del servicio y comprobar su colaboración con la estrategia de notificación, aprovechando la interfaz común proporcionada por el patrón Strategy.
 
 **Clock → Fake.** Se utilizó Clock.fixed(...), una implementación funcional de java.time.Clock proporcionada por el JDK, para sustituir el reloj del sistema por uno con un instante fijo. Esta decisión garantiza pruebas deterministas y reproducibles, permitiendo verificar que la consulta de citas pendientes se realice exactamente dentro de la ventana temporal de 24 horas. A diferencia de un Mock de Mockito, no requiere configurar artificialmente métodos como instant() o getZone(), ya que conserva el comportamiento real de la API temporal, pero con una referencia de tiempo controlada.
+
+
+### El refactor DIP (Parte 2).
+
+### Punto de decisión — diagnóstico antes del refactor.
+En la implementación inicial de *enviarRecordatorioUrgente(Long citaId)* se identificó una violación del Principio de Inversión de Dependencias (DIP), esto se debe a que el servicio construye directamente las implementaciones concretas encargadas de enviar la notificación SMS.
+
+Las líneas de código que están generando esta problemática son:
+
+ReminderChannel canalUrgente =
+    new SmsReminderChannel(
+        new TwilioNotificadorSmsGateway()
+    );
+
+Esta construcción mediante new, dentro del cuerpo del método, genera un acoplamiento directo entre CitaReminderServiceImpl, que contiene la lógica de aplicación, y las clases concretas SmsReminderChannel y TwilioNotificadorSmsGateway. En lugar de depender exclusivamente de abstracciones suministradas desde el exterior, el servicio asume la responsabilidad adicional de crear sus propias dependencias, contraviniendo el propósito de DIP.
+
+**¿Por qué esta implementación dificulta las pruebas unitarias?**
+El principal inconveniente es que el canal urgente y su gateway se instancian internamente cada vez que se ejecuta el método. Por esta razón, no existe un punto de inyección convencional que permita sustituirlos por un Mock mediante el constructor del servicio.
+
+Esto dificulta comprobar de forma aislada escenarios como una falla del gateway de SMS. En particular, necesitamos verificar que, si el envío genera una excepción, la cita no se marque como notificada y no se invoque citaRepository.save(cita). Sin embargo, la construcción interna impide configurar directamente el comportamiento del canal mediante los mecanismos habituales de Mockito utilizados en la actividad.
+
+**Contraste con enviarRecordatoriosPendientes()**
+
+A diferencia del método urgente, enviarRecordatoriosPendientes() fue diseñado desde la Parte 1 para recibir sus colaboradores mediante inyección por constructor, incluyendo CitaRepository, ReminderChannelFactory y Clock.
+
+Esta arquitectura permitió sustituir el repositorio y la fábrica mediante Mocks, controlar la estrategia de notificación devuelta y utilizar Clock.fixed(...) para obtener resultados temporales deterministas. De esta manera, las pruebas unitarias verificaron las interacciones del servicio sin necesitar una base de datos ni ejecutar envíos reales.
+
+Por tanto, mientras enviarRecordatoriosPendientes() facilita el aislamiento de sus dependencias mediante abstracciones inyectadas, enviarRecordatorioUrgente() introduce un acoplamiento innecesario al construir directamente los componentes concretos de notificación.
+

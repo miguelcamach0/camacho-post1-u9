@@ -3,6 +3,8 @@ package com.clinica.recordatorios.service;
 
 import com.clinica.recordatorios.channel.ReminderChannel;
 import com.clinica.recordatorios.channel.ReminderChannelFactory;
+import com.clinica.recordatorios.channel.SmsReminderChannel;
+import com.clinica.recordatorios.channel.gateway.TwilioNotificadorSmsGateway;
 import com.clinica.recordatorios.domain.Cita;
 import com.clinica.recordatorios.repository.CitaRepository;
 
@@ -23,8 +25,7 @@ public class CitaReminderServiceImpl
     public CitaReminderServiceImpl(
             CitaRepository citaRepository,
             ReminderChannelFactory reminderChannelFactory,
-            Clock clock
-    ) {
+            Clock clock) {
         this.citaRepository = citaRepository;
         this.reminderChannelFactory = reminderChannelFactory;
         this.clock = clock;
@@ -37,15 +38,14 @@ public class CitaReminderServiceImpl
         LocalDateTime en24Horas = ahora.plusHours(24);
 
         List<Cita> citasPorNotificar = citaRepository
-            .findByFechaHoraCitaBetweenAndRecordatorioEnviadoFalse(
-                ahora,
-                en24Horas
-            );
+                .findByFechaHoraCitaBetweenAndRecordatorioEnviadoFalse(
+                        ahora,
+                        en24Horas);
 
         for (Cita cita : citasPorNotificar) {
 
             ReminderChannel canal = reminderChannelFactory
-                .obtenerCanal(cita.getCanalPreferido());
+                    .obtenerCanal(cita.getCanalPreferido());
 
             canal.enviar(cita, construirMensaje(cita));
 
@@ -56,9 +56,23 @@ public class CitaReminderServiceImpl
         return citasPorNotificar.size();
     }
 
+    // ⚠ Código de partida — compila y funciona, pero viola DIP.
+    // Agregar temporalmente a CitaReminderServiceImpl:
+
+    @Override
+    public void enviarRecordatorioUrgente(Long citaId) {
+        Cita cita = citaRepository.findById(citaId)
+                .orElseThrow(() -> new CitaNoEncontradaException(citaId));
+
+        ReminderChannel canalUrgente = new SmsReminderChannel(new TwilioNotificadorSmsGateway());
+        canalUrgente.enviar(cita, "URGENTE: su cita es en menos de 2 horas y no ha sido confirmada");
+
+        cita.setRecordatorioEnviado(true);
+        citaRepository.save(cita);
+    }
+
     private String construirMensaje(Cita cita) {
         return "Recordatorio: tiene una cita el "
-            + cita.getFechaHoraCita();
+                + cita.getFechaHoraCita();
     }
 }
-
