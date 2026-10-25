@@ -1,6 +1,5 @@
 # Recordatorios Citas Service
 
-![CI](https://github.com/[usuario]/apellido-post1-u9/actions/workflows/ci.yml/badge.svg)
 
 ## Descripción
 Repositorio del post-contenido de la Unidad 9 de Patrones de Diseño
