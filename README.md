@@ -77,3 +77,45 @@ Esta arquitectura permitió sustituir el repositorio y la fábrica mediante Mock
 
 Por tanto, mientras enviarRecordatoriosPendientes() facilita el aislamiento de sus dependencias mediante abstracciones inyectadas, enviarRecordatorioUrgente() introduce un acoplamiento innecesario al construir directamente los componentes concretos de notificación.
 
+### Refactor DIP: aplicación del Principio de Inversión de Dependencias
+El refactor de enviarRecordatorioUrgente(Long citaId) tuvo como propósito eliminar el acoplamiento directo entre la lógica del servicio y las implementaciones concretas encargadas del envío de notificaciones SMS. En la versión inicial, CitaReminderServiceImpl construía internamente las dependencias mediante new SmsReminderChannel(new TwilioNotificadorSmsGateway()), impidiendo sustituir el canal urgente a través de los mecanismos convencionales de inyección utilizados en las pruebas unitarias.
+
+Para corregir este problema, se trasladó la responsabilidad de construcción a CanalUrgenteConfig, que actúa como parte del Composition Root de la aplicación. Allí se definió un bean de Spring que recibe la abstracción NotificadorSmsGateway y proporciona una instancia de ReminderChannel:
+
+@Bean("canalUrgente")
+public ReminderChannel canalUrgente(NotificadorSmsGateway gateway) {
+    return new SmsReminderChannel(gateway);
+}
+
+Posteriormente, CitaReminderServiceImpl se modificó para recibir el canal urgente mediante inyección por constructor, utilizando @Qualifier("canalUrgente") para identificar el bean correspondiente. De esta manera, el servicio dejó de construir directamente sus colaboradores y pasó a depender de la abstracción ReminderChannel.
+
+Este refactor mantuvo el comportamiento funcional del servicio y permitió sustituir el canal por un Mock. La prueba enviarRecordatorioUrgente_gatewayFalla_noMarcaComoEnviado() demuestra que, al simular un fallo mediante doThrow(...), la cita no se marca como notificada ni se invoca save().
+
+Así, la aplicación de DIP redujo el acoplamiento y facilitó las pruebas unitarias sin modificar la lógica de negocio.
+
+### ¿Por qué H2 real y un gateway mockeado?
+En las pruebas de integración se utilizó H2 en memoria para verificar operaciones reales de persistencia mediante JPA, sin depender de un servidor externo. Aunque H2 no reproduce todas las particularidades de otras bases de datos, resulta adecuado para las consultas evaluadas en este laboratorio.
+
+Por su parte, NotificadorSmsGateway se sustituyó mediante @MockBean para verificar las solicitudes de envío sin realizar llamadas SMS reales ni depender de credenciales, conectividad o disponibilidad del proveedor.
+
+Esta combinación permite probar con componentes reales aquello que queremos verificar (persistencia) y simular las dependencias externas que no forman parte del objetivo de la prueba (gateway SMS).
+
+Además, facilita ejecutar las pruebas mediante mvn verify en GitHub Actions sin contenedores Docker ni servicios externos.
+
+### Punto de decisión — por qué H2 real pero gateway mockeado
+El pipeline de GitHub Actions no requiere contenedores Docker externos porque las pruebas de persistencia utilizan H2 en memoria, que se ejecuta dentro del propio proceso Java. Asimismo, NotificadorSmsGateway se sustituye por un Mock, evitando conexiones con proveedores SMS.
+
+Estas decisiones permiten ejecutar mvn verify de forma automatizada sin configurar servicios adicionales de base de datos, credenciales externas ni infraestructura de contenedores, simplificando el proceso de integración continua.
+
+## Ejecutar las pruebas
+```bash
+mvn test                  # Pruebas unitarias
+mvn verify                # Unitarias + integración
+```
+
+## Herramientas utilizadas
+- Java 21, Spring Boot 3.3, Spring Data JPA, H2, JUnit 5, Mockito
+- Apache Maven, GitHub Actions, Git, GitHub
+
+## Conclusiones
+[Párrafo de 3-5 oraciones con los aprendizajes más relevantes de ambas partes]
