@@ -1,4 +1,5 @@
 # Recordatorios Citas Service
+![CI - Pruebas y Cobertura](https://github.com/miguelcamach0/camacho-post1-u9/actions/workflows/ci.yml/badge.svg)
 
 
 ## Descripción
@@ -93,19 +94,14 @@ Este refactor mantuvo el comportamiento funcional del servicio y permitió susti
 
 Así, la aplicación de DIP redujo el acoplamiento y facilitó las pruebas unitarias sin modificar la lógica de negocio.
 
-### ¿Por qué H2 real y un gateway mockeado?
-En las pruebas de integración se utilizó H2 en memoria para verificar operaciones reales de persistencia mediante JPA, sin depender de un servidor externo. Aunque H2 no reproduce todas las particularidades de otras bases de datos, resulta adecuado para las consultas evaluadas en este laboratorio.
-
-Por su parte, NotificadorSmsGateway se sustituyó mediante @MockBean para verificar las solicitudes de envío sin realizar llamadas SMS reales ni depender de credenciales, conectividad o disponibilidad del proveedor.
-
-Esta combinación permite probar con componentes reales aquello que queremos verificar (persistencia) y simular las dependencias externas que no forman parte del objetivo de la prueba (gateway SMS).
-
-Además, facilita ejecutar las pruebas mediante mvn verify en GitHub Actions sin contenedores Docker ni servicios externos.
-
 ### Punto de decisión — por qué H2 real pero gateway mockeado
-El pipeline de GitHub Actions no requiere contenedores Docker externos porque las pruebas de persistencia utilizan H2 en memoria, que se ejecuta dentro del propio proceso Java. Asimismo, NotificadorSmsGateway se sustituye por un Mock, evitando conexiones con proveedores SMS.
+En las pruebas de integración se utilizó H2 en memoria para verificar operaciones reales de persistencia mediante JPA, sin depender de un servidor externo. Aunque no reproduce todas las particularidades de otras bases de datos, resulta adecuado para las consultas evaluadas en este laboratorio.
 
-Estas decisiones permiten ejecutar mvn verify de forma automatizada sin configurar servicios adicionales de base de datos, credenciales externas ni infraestructura de contenedores, simplificando el proceso de integración continua.
+Por otra parte, NotificadorSmsGateway se sustituyó mediante @MockBean para verificar las solicitudes de envío sin realizar comunicaciones SMS reales ni depender de credenciales, conectividad o disponibilidad del proveedor.
+
+Esta combinación permite probar con componentes reales aquello cuyo comportamiento queremos verificar (persistencia) y simular las dependencias externas que no forman parte del objetivo de la prueba (gateway SMS).
+
+Como resultado, el pipeline de GitHub Actions puede ejecutar mvn verify sin configurar contenedores Docker ni servicios adicionales de base de datos, simplificando y haciendo reproducible el proceso de integración continua.
 
 ## Ejecutar las pruebas
 ```bash
@@ -118,4 +114,4 @@ mvn verify                # Unitarias + integración
 - Apache Maven, GitHub Actions, Git, GitHub
 
 ## Conclusiones
-[Párrafo de 3-5 oraciones con los aprendizajes más relevantes de ambas partes]
+El desarrollo de esta actividad me permitió comprender cómo la aplicación de patrones de diseño y principios SOLID facilita la construcción de software más organizado, desacoplado y fácil de probar. Uno de los aprendizajes más significativos fue la implementación de pruebas unitarias y de integración con JUnit 5 y Mockito, herramientas que no había utilizado anteriormente y que me permitieron verificar el comportamiento del código de manera más rigurosa. Asimismo, conocer y configurar GitHub Actions junto con JaCoCo fue especialmente interesante, ya que descubrí cómo automatizar las pruebas y generar reportes de cobertura durante el desarrollo. Finalmente, comprendí que las buenas decisiones arquitectónicas no solo mejoran la estructura del sistema, sino que también facilitan su mantenimiento, verificación y evolución.
